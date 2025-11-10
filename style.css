@@ -7,3 +7,27 @@ body {
 .table-section.active {
     display: block;
 }
+/* Invisible reset demo button: keeps layout space minimal, only visible on focus for accessibility */
+#reset-demo-btn.reset-demo-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    opacity: 0;
+    transition: opacity .2s ease;
+    cursor: pointer;
+}
+#reset-demo-btn.reset-demo-btn:focus, 
+#reset-demo-btn.reset-demo-btn:active {
+    opacity: 1;
+    outline: 2px solid #dc3545;
+    background: #dc3545;
+}
+#reset-demo-btn.reset-demo-btn::after {
+    content: '\21BA'; /* anticlockwise open circle arrow */
+    font-size: 18px;
+    line-height: 28px;
+    color: #fff;
+    display: block;
+    text-align: center;
+}
