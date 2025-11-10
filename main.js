@@ -268,6 +268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Update populateUserEmployeeDropdown to exclude registered users
   function populateUserEmployeeDropdown() {
     if (!userEmployeeSelect) return;
     const current = userEmployeeSelect.value;
@@ -279,13 +280,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     placeholder.selected = true;
     userEmployeeSelect.appendChild(placeholder);
 
-    employees.forEach(emp => {
-      const opt = document.createElement('option');
-      opt.value = emp.employee_id;
-      const pos = emp.position ? ` (${emp.position})` : '';
-      opt.textContent = `${emp.last_name}, ${emp.first_name}${pos}`;
-      userEmployeeSelect.appendChild(opt);
-    });
+    const registeredEmployeeIds = users.map(u => u.employee_id);
+
+    employees
+      .filter(emp => !registeredEmployeeIds.includes(emp.employee_id))
+      .forEach(emp => {
+        const opt = document.createElement('option');
+        opt.value = emp.employee_id;
+        const pos = emp.position ? ` (${emp.position})` : '';
+        opt.textContent = `${emp.last_name}, ${emp.first_name}${pos}`;
+        userEmployeeSelect.appendChild(opt);
+      });
+
     if (current && [...userEmployeeSelect.options].some(o => o.value === current)) {
       userEmployeeSelect.value = current;
     }
