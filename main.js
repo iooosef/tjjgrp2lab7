@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const resetDemoBtn = document.getElementById('reset-demo-btn');
   const userEmployeeSelect = document.getElementById('user-employee-id');
   const usersTableBody = document.querySelector('#users-table tbody');
+  const userForm = document.getElementById('user-form');
+  const userSaveBtn = document.getElementById('user-save-btn');
 
   // Load data
   let employees = loadEmployees();
@@ -34,6 +36,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     addEmployeeFromForm();
     populateUserEmployeeDropdown();
+  });
+
+  // Save User handler
+  userSaveBtn?.addEventListener('click', async () => {
+    if (!userForm) return;
+    // clear any custom validity
+    const usernameInput = document.getElementById('user-username');
+    const employeeSelect = document.getElementById('user-employee-id');
+    usernameInput?.setCustomValidity('');
+    employeeSelect?.setCustomValidity('');
+
+    if (!userForm.checkValidity()) {
+      userForm.classList.add('was-validated');
+      return;
+    }
+
+    const username = value('user-username');
+    const employee_id = value('user-employee-id');
+    const password = value('user-password');
+
+    // custom duplicate checks
+    if (users.some(u => (u.username || u.email) === username)) {
+      usernameInput?.setCustomValidity('Username already exists');
+      userForm.classList.add('was-validated');
+      usernameInput?.reportValidity();
+      return;
+    }
+    if (users.some(u => u.employee_id === employee_id)) {
+      employeeSelect?.setCustomValidity('This employee already has an account');
+      userForm.classList.add('was-validated');
+      employeeSelect?.reportValidity();
+      return;
+    }
+
+    const newUser = {
+      user_id: generateUserId(),
+      username,
+      email: '',
+      password, // kept for demo/backfill; not recommended in production
+      role: 'Staff',
+      employee_id,
+      status: 'active',
+      added_on: new Date().toISOString(),
+      hashed_password: await hashPassword(password)
+    };
+    users.push(newUser);
+    persistUsers();
+    renderUsersTable();
+
+    // reset form and close modal
+    userForm.reset();
+    userForm.classList.remove('was-validated');
+    const modalEl = document.getElementById('userModal');
+    if (modalEl) {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      modalInstance.hide();
+    }
   });
 
   // Reset demo data
