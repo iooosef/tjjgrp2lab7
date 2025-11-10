@@ -28,67 +28,106 @@ document.addEventListener('DOMContentLoaded', async () => {
   populateUserEmployeeDropdown();
   enableEditButtons();
 
-  // Save Employee handler
+  // Save Employee handler (Add or Edit)
   employeeSaveBtn?.addEventListener('click', () => {
     if (!employeeForm) return;
     if (!employeeForm.checkValidity()) {
       employeeForm.classList.add('was-validated');
       return;
     }
-    addEmployeeFromForm();
-    populateUserEmployeeDropdown();
+    const employeeId = document.getElementById('emp-id').value;
+    if (employeeId) {
+      // Edit mode
+      const existing = employees.find(emp => emp.employee_id === employeeId);
+      if (existing) {
+        existing.last_name = value('emp-last-name');
+        existing.first_name = value('emp-first-name');
+        existing.middle_name = value('emp-middle-name');
+        existing.suffix_name = value('emp-suffix');
+        existing.gender = value('emp-gender');
+        existing.birthdate = value('emp-birthdate');
+        existing.contact_number = value('emp-contact');
+        existing.position = value('emp-position');
+        persistEmployees();
+        renderEmployeesTable();
+        populateUserEmployeeDropdown();
+      }
+    } else {
+      // Add mode
+      addEmployeeFromForm();
+      populateUserEmployeeDropdown();
+    }
+    employeeForm.reset();
+    employeeForm.classList.remove('was-validated');
+    document.getElementById('emp-id').value = '';
+    const modalEl = document.getElementById('employeeModal');
+    if (modalEl) {
+      const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      modalInstance.hide();
+    }
   });
 
-  // Save User handler
+  // Save User handler (Add or Edit, only allow username/password edit in Edit mode)
   userSaveBtn?.addEventListener('click', async () => {
     if (!userForm) return;
-    // clear any custom validity
     const usernameInput = document.getElementById('user-username');
     const employeeSelect = document.getElementById('user-employee-id');
     usernameInput?.setCustomValidity('');
     employeeSelect?.setCustomValidity('');
-
     if (!userForm.checkValidity()) {
       userForm.classList.add('was-validated');
       return;
     }
-
-    const username = value('user-username');
-    const employee_id = value('user-employee-id');
-    const password = value('user-password');
-
-    // custom duplicate checks
-    if (users.some(u => (u.username || u.email) === username)) {
-      usernameInput?.setCustomValidity('Username already exists');
-      userForm.classList.add('was-validated');
-      usernameInput?.reportValidity();
-      return;
+    const userId = document.getElementById('user-id').value;
+    if (userId) {
+      // Edit mode: only update username and password
+      const existing = users.find(u => u.user_id === userId);
+      if (existing) {
+        existing.username = value('user-username');
+        if (value('user-password')) {
+          existing.password = value('user-password');
+          existing.hashed_password = await hashPassword(existing.password);
+        }
+        persistUsers();
+        renderUsersTable();
+        populateUserEmployeeDropdown();
+      }
+    } else {
+      // Add mode
+      const username = value('user-username');
+      const employee_id = value('user-employee-id');
+      const password = value('user-password');
+      if (users.some(u => (u.username || u.email) === username)) {
+        usernameInput?.setCustomValidity('Username already exists');
+        userForm.classList.add('was-validated');
+        usernameInput?.reportValidity();
+        return;
+      }
+      if (users.some(u => u.employee_id === employee_id)) {
+        employeeSelect?.setCustomValidity('This employee already has an account');
+        userForm.classList.add('was-validated');
+        employeeSelect?.reportValidity();
+        return;
+      }
+      const newUser = {
+        user_id: generateUserId(),
+        username,
+        email: '',
+        password,
+        role: 'Staff',
+        employee_id,
+        status: 'active',
+        added_on: new Date().toISOString(),
+        hashed_password: await hashPassword(password)
+      };
+      users.push(newUser);
+      persistUsers();
+      renderUsersTable();
+      populateUserEmployeeDropdown();
     }
-    if (users.some(u => u.employee_id === employee_id)) {
-      employeeSelect?.setCustomValidity('This employee already has an account');
-      userForm.classList.add('was-validated');
-      employeeSelect?.reportValidity();
-      return;
-    }
-
-    const newUser = {
-      user_id: generateUserId(),
-      username,
-      email: '',
-      password, // kept for demo/backfill; not recommended in production
-      role: 'Staff',
-      employee_id,
-      status: 'active',
-      added_on: new Date().toISOString(),
-      hashed_password: await hashPassword(password)
-    };
-    users.push(newUser);
-    persistUsers();
-    renderUsersTable();
-
-    // reset form and close modal
     userForm.reset();
     userForm.classList.remove('was-validated');
+    document.getElementById('user-id').value = '';
     const modalEl = document.getElementById('userModal');
     if (modalEl) {
       const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
@@ -401,6 +440,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (employeeId) {
         const employee = employees.find(emp => emp.employee_id === employeeId);
         if (employee) {
+          employeeForm.reset();
+          employeeForm.classList.remove('was-validated');
+          document.getElementById('emp-id').value = employee.employee_id;
           document.getElementById('emp-last-name').value = employee.last_name;
           document.getElementById('emp-first-name').value = employee.first_name;
           document.getElementById('emp-middle-name').value = employee.middle_name;
@@ -426,9 +468,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (userId) {
         const user = users.find(u => u.user_id === userId);
         if (user) {
-          document.getElementById('user-employee-id').value = user.employee_id;
+          setUserModalMode(true);
+          userForm.reset();
+          userForm.classList.remove('was-validated');
+          document.getElementById('user-id').value = user.user_id;
           document.getElementById('user-username').value = user.username;
-          document.getElementById('user-password').value = ''; // Clear password field for security
+          document.getElementById('user-password').value = '';
           const modalEl = document.getElementById('userModal');
           const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
           modalInstance.show();
@@ -437,17 +482,89 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // User Modal: show/hide employee select and set header
+  function setUserModalMode(isEdit) {
+    const employeeRow = document.getElementById('user-employee-row');
+    const userModalLabel = document.getElementById('userModalLabel');
+    if (isEdit) {
+      employeeRow.style.display = 'none';
+      userModalLabel.textContent = 'Edit User';
+    } else {
+      employeeRow.style.display = '';
+      userModalLabel.textContent = 'Add User';
+    }
+  }
+
+  // Save Edited Employee
+  employeeSaveBtn?.addEventListener('click', () => {
+    if (!employeeForm.checkValidity()) {
+      employeeForm.classList.add('was-validated');
+      return;
+    }
+
+    const employeeId = document.getElementById('emp-id')?.value;
+    const existingEmployee = employees.find(emp => emp.employee_id === employeeId);
+
+    if (existingEmployee) {
+      existingEmployee.last_name = value('emp-last-name');
+      existingEmployee.first_name = value('emp-first-name');
+      existingEmployee.middle_name = value('emp-middle-name');
+      existingEmployee.suffix_name = value('emp-suffix');
+      existingEmployee.gender = value('emp-gender');
+      existingEmployee.birthdate = value('emp-birthdate');
+      existingEmployee.contact_number = value('emp-contact');
+      existingEmployee.position = value('emp-position');
+      persistEmployees();
+      renderEmployeesTable();
+    }
+
+    employeeForm.reset();
+    employeeForm.classList.remove('was-validated');
+    const modalEl = document.getElementById('employeeModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    modalInstance.hide();
+  });
+
+  // Save Edited User
+  userSaveBtn?.addEventListener('click', () => {
+    if (!userForm.checkValidity()) {
+      userForm.classList.add('was-validated');
+      return;
+    }
+
+    const userId = document.getElementById('user-id')?.value;
+    const existingUser = users.find(u => u.user_id === userId);
+
+    if (existingUser) {
+      existingUser.employee_id = value('user-employee-id');
+      existingUser.username = value('user-username');
+      existingUser.password = value('user-password');
+      existingUser.hashed_password = hashPassword(existingUser.password);
+      persistUsers();
+      renderUsersTable();
+    }
+
+    userForm.reset();
+    userForm.classList.remove('was-validated');
+    const modalEl = document.getElementById('userModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    modalInstance.hide();
+  });
+
   // Clear Employee Form on Add
   const addEmployeeBtn = document.getElementById('add-employee-btn');
   addEmployeeBtn?.addEventListener('click', () => {
     employeeForm.reset();
     employeeForm.classList.remove('was-validated');
+    document.getElementById('emp-id').value = '';
   });
 
   // Clear User Form on Add
   const addUserBtn = document.getElementById('add-user-btn');
   addUserBtn?.addEventListener('click', () => {
+    setUserModalMode(false);
     userForm.reset();
     userForm.classList.remove('was-validated');
+    document.getElementById('user-id').value = '';
   });
 });

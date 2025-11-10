@@ -69,6 +69,7 @@
                             </div>
                             <div class="modal-body">
                                 <form id="employee-form" novalidate>
+                                    <input type="hidden" id="emp-id" />
                                     <div class="row g-3">
                                         <div class="col-md-4">
                                             <label for="emp-last-name" class="form-label">Last Name *</label>
@@ -160,7 +161,7 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- User Add Modal -->
+                <!-- User Add/Edit Modal -->
                 <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
                     <div class="modal-dialog modal-lg modal-dialog-scrollable">
                         <div class="modal-content">
@@ -170,7 +171,8 @@
                             </div>
                             <div class="modal-body">
                                 <form id="user-form" novalidate>
-                                    <div class="row g-3">
+                                    <input type="hidden" id="user-id" />
+                                    <div class="row g-3" id="user-employee-row">
                                         <div class="col-12">
                                             <label for="user-employee-id" class="form-label">Employee *</label>
                                             <select class="form-select" id="user-employee-id" required>
@@ -179,6 +181,8 @@
                                             </select>
                                             <div class="invalid-feedback">Employee selection is required.</div>
                                         </div>
+                                    </div>
+                                    <div class="row g-3">
                                         <div class="col-md-6">
                                             <label for="user-username" class="form-label">Username *</label>
                                             <input type="text" class="form-control" id="user-username" required minlength="3" maxlength="255" placeholder="Enter username">
@@ -190,7 +194,6 @@
                                             <div class="invalid-feedback">Password (min 6 chars) is required.</div>
                                         </div>
                                     </div>
-                                    <!-- Future submission button (non-functional now) -->
                                 </form>
                             </div>
                             <div class="modal-footer">
