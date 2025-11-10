@@ -4,7 +4,7 @@
 // - Future: search and sorting
 // - Future: dynamic table render and search
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const employeeForm = document.getElementById('employee-form');
   const employeeSaveBtn = document.getElementById('employee-save-btn');
   const employeesTableBody = document.querySelector('#employees-table tbody');
@@ -16,8 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let employees = loadEmployees();
   let users = loadUsers();
 
-  // Seed Admin employee/user if missing
-  seedAdminRecords();
+  // Seed Admin employee/user if missing and backfill missing hashes
+  await backfillUserHashes();
+  await seedAdminRecords();
 
   // Initial render
   renderEmployeesTable();
@@ -36,13 +37,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Reset demo data
-  resetDemoBtn?.addEventListener('click', () => {
+  resetDemoBtn?.addEventListener('click', async () => {
     if (!confirm('Reset demo data? This will clear all employees and users stored in this browser.')) return;
     localStorage.removeItem('employeesData');
     localStorage.removeItem('usersData');
     employees = [];
     users = [];
-    seedAdminRecords();
+    await seedAdminRecords();
     renderEmployeesTable();
     renderUsersTable();
     populateUserEmployeeDropdown();
@@ -78,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('usersData', JSON.stringify(users));
   }
 
-  // UUID helper
+  // UUID helper (legacy or other IDs)
   function generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
       const r = Math.random() * 16 | 0;
@@ -87,10 +88,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Employee ID helper: YYMMNN (YY=year last two, MM=current minute, NN=auto-increment)
+  function generateEmployeeId() {
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    let counter = parseInt(localStorage.getItem('employeeCounter') || '0', 10);
+    counter += 1;
+    localStorage.setItem('employeeCounter', String(counter));
+    const nn = String(counter).padStart(2, '0');
+    return `${yy}${mm}${nn}`;
+  }
+
+  // User ID helper: YYMMNN with independent counter
+  function generateUserId() {
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    let counter = parseInt(localStorage.getItem('userCounter') || '0', 10);
+    counter += 1;
+    localStorage.setItem('userCounter', String(counter));
+    const nn = String(counter).padStart(2, '0');
+    return `${yy}${mm}${nn}`;
+  }
+
   // Employees
   function addEmployeeFromForm() {
     const data = {
-      employee_id: generateUUID(),
+      employee_id: generateEmployeeId(),
       last_name: value('emp-last-name'),
       first_name: value('emp-first-name'),
       middle_name: value('emp-middle-name'),
@@ -152,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${escapeHtml(u.employee_id || '')}</td>
         <td>${escapeHtml(u.status || '')}</td>
         <td>${formatDate(u.added_on || '')}</td>
+        <td>${escapeHtml(u.hashed_password || '')}</td>
         <td><button class="btn btn-sm btn-outline-secondary" disabled title="Edit coming soon">Edit</button></td>
       `;
       usersTableBody.appendChild(tr);
@@ -182,12 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Seeding
-  function seedAdminRecords() {
-    const ADMIN_EMPLOYEE_ID = '00000000-0000-0000-0000-000000000001';
-    let adminEmp = employees.find(e => e.employee_id === ADMIN_EMPLOYEE_ID);
+  async function seedAdminRecords() {
+    // Find by name instead of fixed ID so ID scheme changes don't break seeding
+    let adminEmp = employees.find(e => e.last_name === 'Admin' && e.first_name === 'System');
     if (!adminEmp) {
       adminEmp = {
-        employee_id: ADMIN_EMPLOYEE_ID,
+        employee_id: generateEmployeeId(),
         last_name: 'Admin',
         first_name: 'System',
         middle_name: 'A',
@@ -195,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gender: 'Other',
         birthdate: '1990-01-01',
         contact_number: '0000000000',
-        position: 'admin',
+        position: 'human_resources',
         status: 'active',
         added_on: new Date().toISOString()
       };
@@ -203,21 +229,55 @@ document.addEventListener('DOMContentLoaded', () => {
       persistEmployees();
     }
 
-    const existingAdminUser = users.find(u => (u.role === 'Admin') && (u.employee_id === ADMIN_EMPLOYEE_ID));
+    const existingAdminUser = users.find(u => (u.role === 'Admin') && (u.employee_id === adminEmp.employee_id));
     if (!existingAdminUser) {
       const adminUser = {
-        user_id: generateUUID(),
+        user_id: generateUserId(),
         username: 'admin',
         email: 'admin@example.com',
-        password: 'admin',
+        password: 'admin', // demo only
         role: 'Admin',
-        employee_id: ADMIN_EMPLOYEE_ID,
+        employee_id: adminEmp.employee_id,
         status: 'active',
         added_on: new Date().toISOString()
       };
+      adminUser.hashed_password = await hashPassword(adminUser.password);
       users.unshift(adminUser);
       persistUsers();
     }
+  }
+
+  // Hashing helpers
+  async function hashPassword(plain) {
+    try {
+      if (window.crypto && window.crypto.subtle) {
+        const enc = new TextEncoder();
+        const data = enc.encode(plain);
+        const buf = await window.crypto.subtle.digest('SHA-256', data);
+        const bytes = Array.from(new Uint8Array(buf));
+        return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (e) {
+      console.warn('WebCrypto hash failed, falling back', e);
+    }
+    // Fallback (non-cryptographic; demo only)
+    let hash = 0;
+    for (let i = 0; i < plain.length; i++) {
+      hash = ((hash << 5) - hash) + plain.charCodeAt(i);
+      hash |= 0;
+    }
+    return ('00000000' + (hash >>> 0).toString(16)).slice(-8);
+  }
+
+  async function backfillUserHashes() {
+    let changed = false;
+    for (const u of users) {
+      if (!u.hashed_password && u.password) {
+        u.hashed_password = await hashPassword(u.password);
+        changed = true;
+      }
+    }
+    if (changed) persistUsers();
   }
 
   // Utils
