@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderEmployeesTable();
   renderUsersTable();
   populateUserEmployeeDropdown();
+  enableEditButtons();
 
   // Save Employee handler
   employeeSaveBtn?.addEventListener('click', () => {
@@ -242,7 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <td>${escapeHtml(emp.position)}</td>
       <td>${escapeHtml(emp.status)}</td>
       <td>${formatDate(emp.added_on)}</td>
-      <td><button class="btn btn-sm btn-outline-secondary" disabled title="Edit coming soon">Edit</button></td>
+      <td><button class="btn btn-sm btn-outline-secondary" title="Edit">Edit</button></td>
     `;
     employeesTableBody.appendChild(tr);
   }
@@ -261,7 +262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <td>${escapeHtml(u.status || '')}</td>
         <td>${formatDate(u.added_on || '')}</td>
         <td>${escapeHtml(u.hashed_password || '')}</td>
-        <td><button class="btn btn-sm btn-outline-secondary" disabled title="Edit coming soon">Edit</button></td>
+        <td><button class="btn btn-sm btn-outline-secondary" title="Edit">Edit</button></td>
       `;
       usersTableBody.appendChild(tr);
     });
@@ -370,4 +371,63 @@ document.addEventListener('DOMContentLoaded', async () => {
   function formatDate(iso) {
     try { return new Date(iso).toLocaleString(); } catch { return iso; }
   }
+
+  // Enable Edit buttons
+  function enableEditButtons() {
+    const employeeEditButtons = employeesTableBody.querySelectorAll('button[title="Edit"]');
+    const userEditButtons = usersTableBody.querySelectorAll('button[title="Edit"]');
+
+    employeeEditButtons.forEach(button => button.disabled = false);
+    userEditButtons.forEach(button => button.disabled = false);
+  }
+
+  // Call enableEditButtons after rendering tables
+  renderEmployeesTable();
+  renderUsersTable();
+  enableEditButtons();
+
+  // Edit Employee Modal
+  employeesTableBody.addEventListener('click', (event) => {
+    const editButton = event.target.closest('button[title="Edit"]');
+    if (editButton) {
+      const row = editButton.closest('tr');
+      const employeeId = row?.querySelector('td:first-child')?.textContent;
+      if (employeeId) {
+        const employee = employees.find(emp => emp.employee_id === employeeId);
+        if (employee) {
+          document.getElementById('emp-last-name').value = employee.last_name;
+          document.getElementById('emp-first-name').value = employee.first_name;
+          document.getElementById('emp-middle-name').value = employee.middle_name;
+          document.getElementById('emp-suffix').value = employee.suffix_name;
+          document.getElementById('emp-gender').value = employee.gender;
+          document.getElementById('emp-birthdate').value = employee.birthdate;
+          document.getElementById('emp-contact').value = employee.contact_number;
+          document.getElementById('emp-position').value = employee.position;
+          const modalEl = document.getElementById('employeeModal');
+          const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+          modalInstance.show();
+        }
+      }
+    }
+  });
+
+  // Edit User Modal
+  usersTableBody.addEventListener('click', (event) => {
+    const editButton = event.target.closest('button[title="Edit"]');
+    if (editButton) {
+      const row = editButton.closest('tr');
+      const userId = row?.querySelector('td:first-child')?.textContent;
+      if (userId) {
+        const user = users.find(u => u.user_id === userId);
+        if (user) {
+          document.getElementById('user-employee-id').value = user.employee_id;
+          document.getElementById('user-username').value = user.username;
+          document.getElementById('user-password').value = ''; // Clear password field for security
+          const modalEl = document.getElementById('userModal');
+          const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+          modalInstance.show();
+        }
+      }
+    }
+  });
 });
