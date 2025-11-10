@@ -108,6 +108,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateUserEmployeeDropdown();
   });
 
+  // Search Employees
+  const searchEmployeesInput = document.getElementById('search-employees');
+  searchEmployeesInput?.addEventListener('input', () => {
+    const query = searchEmployeesInput.value.toLowerCase();
+    const rows = employeesTableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+      const cells = Array.from(row.cells);
+      const matches = cells.some(cell => cell.textContent.toLowerCase().includes(query));
+      row.style.display = matches ? '' : 'none';
+    });
+  });
+
+  // Search Users
+  const searchUsersInput = document.getElementById('search-users');
+  searchUsersInput?.addEventListener('input', () => {
+    const query = searchUsersInput.value.toLowerCase();
+    const rows = usersTableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+      const cells = Array.from(row.cells);
+      const matches = cells.some(cell => cell.textContent.toLowerCase().includes(query));
+      row.style.display = matches ? '' : 'none';
+    });
+  });
+
   // Storage helpers
   function loadEmployees() {
     try {
