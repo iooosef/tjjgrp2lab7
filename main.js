@@ -430,4 +430,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   });
+
+  // Clear Employee Form on Add
+  const addEmployeeBtn = document.getElementById('add-employee-btn');
+  addEmployeeBtn?.addEventListener('click', () => {
+    employeeForm.reset();
+    employeeForm.classList.remove('was-validated');
+  });
+
+  // Clear User Form on Add
+  const addUserBtn = document.getElementById('add-user-btn');
+  addUserBtn?.addEventListener('click', () => {
+    userForm.reset();
+    userForm.classList.remove('was-validated');
+  });
 });
